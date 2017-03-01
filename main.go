@@ -4,10 +4,12 @@ import (
 	"bufio"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/BurntSushi/toml"
 )
@@ -43,11 +45,13 @@ func getHashesFromFrontmatter(path string) {
 		ImageIpfs  string   `toml:"image_ipfs"`
 		ImagesIpfs []string `toml:"images_ipfs"`
 	}
+
 	var tomlObj tomlStruct
 	_, er := toml.Decode(tomlStr, &tomlObj)
 	check(er)
 	//fmt.Printf("%s (%s)\n", tomlObj.Title, tomlObj.Image)
-	fmt.Println(path)
+	fmt.Println()
+	fmt.Println(tomlObj.Title)
 	if len(tomlObj.ImageIpfs) > 0 {
 		fmt.Println(tomlObj.ImageIpfs)
 		downloadFile("output/"+tomlObj.ImageIpfs+".jpg",
@@ -60,25 +64,57 @@ func getHashesFromFrontmatter(path string) {
 	}
 }
 
-func downloadFile(filepath string, url string) (err error) {
+func timeTrack(start time.Time, name string) {
+	elapsed := time.Since(start)
+	log.Printf("%s took %s", name, elapsed)
+}
 
-	// Create the file
-	out, err := os.Create(filepath)
-	if err != nil {
-		return err
+// WriteCounter counts the number of bytes written to it.
+type WriteCounter struct {
+	Total int64 // Total # of bytes transferred
+}
+
+// Write implements the io.Writer interface.
+//
+// Always completes and never returns an error.
+func (wc *WriteCounter) Write(p []byte) (int, error) {
+	n := len(p)
+	wc.Total += int64(n)
+	fmt.Printf("\rRead %d bytes for a total of %d\n", n, wc.Total)
+	return n, nil
+}
+
+func downloadFile(filepath string, url string) (err error) {
+	if _, er := os.Stat(filepath); !os.IsNotExist(er) {
+		fmt.Println("File already exists. Continue...")
+		return er
 	}
-	defer out.Close()
+	defer timeTrack(time.Now(), "downloading "+url)
 
 	// Get the data
-	resp, err := http.Get(url)
+	timeout := time.Duration(35 * time.Second)
+	client := http.Client{
+		Timeout: timeout,
+	}
+	resp, err := client.Get(url)
 	if err != nil {
+		fmt.Print(err)
 		return err
 	}
 	defer resp.Body.Close()
 
-	// Writer the body to file
-	_, err = io.Copy(out, resp.Body)
+	// Create the file
+	out, err := os.Create(filepath)
 	if err != nil {
+		fmt.Print(err)
+		return err
+	}
+	defer out.Close()
+	// Writer the body to file
+	src := io.TeeReader(resp.Body, &WriteCounter{})
+	_, err = io.Copy(out, src)
+	if err != nil {
+		fmt.Print("Copy error:", err)
 		return err
 	}
 
