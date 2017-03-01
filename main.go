@@ -14,18 +14,38 @@ import (
 	"github.com/BurntSushi/toml"
 )
 
+const (
+	ipfsHost      = "https://ipfs.io/ipfs/"
+	outputDefault = "output/"
+)
+
+type tattoo struct {
+	ID              string   `json:"id"`
+	Link            string   `json:"link,omitempty"`
+	Title           string   `json:"title,omitempty"`
+	MadeDate        string   `json:"tattoodate,omitempty" toml:"tattoodate"`
+	PublishDate     string   `json:"date,omitempty"`
+	Tags            []string `json:"tags,omitempty"`
+	BodyParts       []string `json:"bodypart,omitempty"`
+	ImageIpfs       string   `json:"image_ipfs" toml:"image_ipfs"`
+	ImagesIpfs      []string `json:"images_ipfs,omitempty" toml:"images_ipfs"`
+	LocationCity    string   `json:"made_at_city" toml:"location_city"`
+	LocationCountry string   `json:"made_at_country" toml:"location_country"`
+	MadeAtShop      string   `json:"made_at_shop,omitempty" toml:"made_at_shop"`
+	DurationMin     int      `json:"duration_min"`
+	Gender          string   `json:"gender"`
+	Extra           string   `json:"extra"`
+	Article         string   `json:"article"`
+}
+
 func check(e error) {
 	if e != nil {
 		panic(e)
 	}
 }
 
-func getHashesFromFrontmatter(path string) {
-	file, err := os.Open(path)
-	check(err)
-	defer file.Close()
-
-	scanner := bufio.NewScanner(file)
+func findTattosFromFrontmatter(r io.Reader) (tattoo, error) {
+	scanner := bufio.NewScanner(r)
 	scanner.Scan()
 	delim := scanner.Text()
 
@@ -39,29 +59,15 @@ func getHashesFromFrontmatter(path string) {
 	}
 	//fmt.Print(tomlStr)
 
-	type tomlStruct struct {
-		Title      string
-		Image      string
-		ImageIpfs  string   `toml:"image_ipfs"`
-		ImagesIpfs []string `toml:"images_ipfs"`
+	var tat tattoo
+	_, er := toml.Decode(tomlStr, &tat)
+	if er != nil {
+		return tat, er
 	}
-
-	var tomlObj tomlStruct
-	_, er := toml.Decode(tomlStr, &tomlObj)
-	check(er)
 	//fmt.Printf("%s (%s)\n", tomlObj.Title, tomlObj.Image)
 	fmt.Println()
-	fmt.Println(tomlObj.Title)
-	if len(tomlObj.ImageIpfs) > 0 {
-		fmt.Println(tomlObj.ImageIpfs)
-		downloadFile("output/"+tomlObj.ImageIpfs+".jpg",
-			"http://gateway.ipfs.io/ipfs/"+tomlObj.ImageIpfs)
-	}
-	for _, ipfs := range tomlObj.ImagesIpfs {
-		fmt.Println(ipfs)
-		downloadFile("output/"+ipfs+".jpg",
-			"http://gateway.ipfs.io/ipfs/"+ipfs)
-	}
+	fmt.Println(tat.Title)
+	return tat, nil
 }
 
 func timeTrack(start time.Time, name string) {
@@ -80,23 +86,23 @@ type WriteCounter struct {
 func (wc *WriteCounter) Write(p []byte) (int, error) {
 	n := len(p)
 	wc.Total += int64(n)
-	fmt.Printf("\rRead %d bytes for a total of %d\n", n, wc.Total)
+	//fmt.Printf("\rRead %d bytes for a total of %d\n", n, wc.Total)
 	return n, nil
 }
 
-func downloadFile(filepath string, url string) (err error) {
+func downloadFileFromIPFS(filepath, ipfsHash string) (err error) {
 	if _, er := os.Stat(filepath); !os.IsNotExist(er) {
 		fmt.Println("File already exists. Continue...")
 		return er
 	}
-	defer timeTrack(time.Now(), "downloading "+url)
+	defer timeTrack(time.Now(), "downloading "+ipfsHash)
 
 	// Get the data
 	timeout := time.Duration(35 * time.Second)
 	client := http.Client{
 		Timeout: timeout,
 	}
-	resp, err := client.Get(url)
+	resp, err := client.Get(ipfsHost + ipfsHash)
 	if err != nil {
 		fmt.Print(err)
 		return err
@@ -130,10 +136,28 @@ func main() {
 	go func() {
 		c <- filepath.Walk(dirPath,
 			func(path string, _ os.FileInfo, _ error) error {
-				if strings.HasSuffix(strings.ToLower(path), ".md") {
-
-					getHashesFromFrontmatter(path)
+				if !strings.HasSuffix(strings.ToLower(path), ".md") {
+					return nil
 				}
+				file, err := os.Open(path)
+				check(err)
+				defer file.Close()
+
+				tat, _ := findTattosFromFrontmatter(file)
+
+				filePrefix := strings.Replace(tat.MadeDate[:10], "-", ".", -1)
+				filePrefix += " - " + tat.Title + " @" + tat.MadeAtShop
+				os.Mkdir(outputDefault+filePrefix, os.ModePerm)
+				filePrefix += "/" + filePrefix
+				if len(tat.ImageIpfs) > 0 {
+					fmt.Println(tat.ImageIpfs)
+					downloadFileFromIPFS(outputDefault+filePrefix+tat.ImageIpfs+".jpg", tat.ImageIpfs)
+				}
+				for _, ipfsHash := range tat.ImagesIpfs {
+					fmt.Println(ipfsHash)
+					downloadFileFromIPFS(outputDefault+filePrefix+ipfsHash+".jpg", ipfsHash)
+				}
+
 				return nil
 			})
 	}()
