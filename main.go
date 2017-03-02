@@ -23,9 +23,9 @@ const (
 )
 
 type tattoo struct {
-	ID              string   `json:"id"`
+	ID              string   `json:"id" toml:"id"`
 	Link            string   `json:"link,omitempty"`
-	Title           string   `json:"title,omitempty"`
+	Title           string   `json:"title,omitempty" toml:"title"`
 	MadeDate        string   `json:"tattoodate,omitempty" toml:"tattoodate"`
 	PublishDate     string   `json:"date,omitempty"`
 	Tags            []string `json:"tags,omitempty"`
@@ -147,6 +147,11 @@ func main() {
 
 				tatTomlStr, fmEr := extractTomlStr(file)
 
+				if fmEr != nil {
+					log.Println()
+					color.New(color.FgRed).Add(color.Underline).Println(fmEr.Error())
+					return fmEr
+				}
 				//fmt.Print(tomlStr)
 				var tat tattoo
 				_, er := toml.Decode(tatTomlStr, &tat)
@@ -154,11 +159,6 @@ func main() {
 					log.Println()
 					color.New(color.FgRed).Add(color.Underline).Println(er.Error())
 					return er
-				}
-				if fmEr != nil {
-					log.Println()
-					color.New(color.FgRed).Add(color.Underline).Println(fmEr.Error())
-					return fmEr
 				}
 				//fmt.Printf("%s (%s)\n", tomlObj.Title, tomlObj.Image)
 				fmt.Println() // Mix up foreground and background colors, create new mixes!
