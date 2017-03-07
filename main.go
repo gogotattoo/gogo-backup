@@ -150,6 +150,7 @@ func main() {
 				color.New(color.Bold).Add(color.Italic).Println(tatTomlStr)
 				filePrefix := strings.Replace(tat.MadeDate[:10], "-", ".", -1)
 				filePrefix += " - " + tat.Title + " @" + tat.MadeAtShop
+				filePrefix = strings.Replace(filePrefix, "/", ".", -1)
 				os.Mkdir(outputDefault+filePrefix, os.ModePerm)
 				filePrefix += "/" + filePrefix
 				if len(tat.ImageIpfs) > 0 {
