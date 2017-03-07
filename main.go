@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bufio"
 	"fmt"
 	"io"
 	"log"
@@ -11,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/gogotattoo/common/util"
 	json "github.com/nwidger/jsoncolor"
 
 	"github.com/BurntSushi/toml"
@@ -47,22 +47,6 @@ func check(e error) {
 	}
 }
 
-func extractTomlStr(r io.Reader) (string, error) {
-	scanner := bufio.NewScanner(r)
-	scanner.Scan()
-	delim := scanner.Text()
-
-	var text string
-	var tomlStr string
-	for ; text != delim; text = scanner.Text() {
-		scanner.Scan()
-		if len(text) > 0 {
-			tomlStr += text + "\n"
-		}
-	}
-	return tomlStr, nil
-}
-
 func timeTrack(start time.Time, name string) {
 	elapsed := time.Since(start)
 	color.Green("\n%s took %s\n\n", name, elapsed)
@@ -97,7 +81,7 @@ func downloadFileFromIPFS(filepath, ipfsHash string) (err error) {
 	defer timeTrack(time.Now(), "downloading "+ipfsHash)
 
 	// Get the data
-	timeout := time.Duration(35 * time.Second)
+	timeout := time.Duration(135 * time.Second)
 	client := http.Client{
 		Timeout: timeout,
 	}
@@ -122,6 +106,7 @@ func downloadFileFromIPFS(filepath, ipfsHash string) (err error) {
 	_, err = io.Copy(out, src)
 	if err != nil {
 		color.New(color.FgRed).Add(color.Underline).Println(err)
+		os.Remove(filepath)
 		brokenFiles = append(brokenFiles, ipfsHash)
 		return err
 	}
@@ -145,7 +130,7 @@ func main() {
 				check(err)
 				defer file.Close()
 
-				tatTomlStr, fmEr := extractTomlStr(file)
+				tatTomlStr, fmEr := util.ExtractTomlStr(file)
 
 				if fmEr != nil {
 					log.Println()
@@ -189,7 +174,7 @@ func main() {
 	}()
 	<-c
 
-	color.Green("Downloaded files: ", downloadedFiles)
-	color.Green("Existing files: ", existingFiles)
-	color.Red("Failed files: ", len(brokenFiles))
+	color.Green("Downloaded files: " + string(downloadedFiles))
+	color.Green("Existing files: " + string(existingFiles))
+	color.Red("Failed files: " + string(len(brokenFiles)))
 }
