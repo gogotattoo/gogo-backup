@@ -148,7 +148,12 @@ func main() {
 				tatJSON, _ := json.MarshalIndent(tat, "", "")
 				log.Println(string(tatJSON))
 				color.New(color.Bold).Add(color.Italic).Println(tatTomlStr)
-				filePrefix := strings.Replace(tat.MadeDate[:10], "-", ".", -1)
+				var filePrefix string
+				if len(tat.MadeDate) > 0 {
+					filePrefix = strings.Replace(tat.MadeDate[:10], "-", ".", -1)
+				} else {
+					filePrefix = strings.Replace(tat.PublishDate[:10], "-", ".", -1)
+				}
 				filePrefix += " - " + tat.Title + " @" + tat.MadeAtShop
 				filePrefix = strings.Replace(filePrefix, "/", ".", -1)
 				os.Mkdir(outputDefault+filePrefix, os.ModePerm)
