@@ -7,9 +7,11 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
+	"github.com/gogotattoo/common/models"
 	"github.com/gogotattoo/common/util"
 	json "github.com/nwidger/jsoncolor"
 
@@ -21,25 +23,6 @@ const (
 	ipfsHost      = "https://ipfs.io/ipfs/"
 	outputDefault = "output/"
 )
-
-type tattoo struct {
-	ID              string   `json:"id" toml:"id"`
-	Link            string   `json:"link,omitempty"`
-	Title           string   `json:"title,omitempty" toml:"title"`
-	MadeDate        string   `json:"tattoodate,omitempty" toml:"tattoodate"`
-	PublishDate     string   `json:"date,omitempty"`
-	Tags            []string `json:"tags,omitempty"`
-	BodyParts       []string `json:"bodypart,omitempty"`
-	ImageIpfs       string   `json:"image_ipfs" toml:"image_ipfs"`
-	ImagesIpfs      []string `json:"images_ipfs,omitempty" toml:"images_ipfs"`
-	LocationCity    string   `json:"made_at_city" toml:"location_city"`
-	LocationCountry string   `json:"made_at_country" toml:"location_country"`
-	MadeAtShop      string   `json:"made_at_shop,omitempty" toml:"made_at_shop"`
-	DurationMin     int      `json:"duration_min"`
-	Gender          string   `json:"gender"`
-	Extra           string   `json:"extra"`
-	Article         string   `json:"article"`
-}
 
 func check(e error) {
 	if e != nil {
@@ -138,7 +121,7 @@ func main() {
 					return fmEr
 				}
 				//fmt.Print(tomlStr)
-				var tat tattoo
+				var tat models.Artwork
 				_, er := toml.Decode(tatTomlStr, &tat)
 				if er != nil {
 					log.Println()
@@ -151,8 +134,14 @@ func main() {
 				tatJSON, _ := json.MarshalIndent(tat, "", "")
 				log.Println(string(tatJSON))
 				color.New(color.Bold).Add(color.Italic).Println(tatTomlStr)
-				filePrefix := strings.Replace(tat.MadeDate[:10], "-", ".", -1)
+				var filePrefix string
+				if len(tat.MadeDate) > 0 {
+					filePrefix = strings.Replace(tat.MadeDate[:10], "-", ".", -1)
+				} else {
+					filePrefix = strings.Replace(tat.PublishDate[:10], "-", ".", -1)
+				}
 				filePrefix += " - " + tat.Title + " @" + tat.MadeAtShop
+				filePrefix = strings.Replace(filePrefix, "/", ".", -1)
 				os.Mkdir(outputDefault+filePrefix, os.ModePerm)
 				filePrefix += "/" + filePrefix
 				if len(tat.ImageIpfs) > 0 {
@@ -174,7 +163,7 @@ func main() {
 	}()
 	<-c
 
-	color.Green("Downloaded files: " + string(downloadedFiles))
-	color.Green("Existing files: " + string(existingFiles))
-	color.Red("Failed files: " + string(len(brokenFiles)))
+	color.Green("Downloaded files: " + strconv.Itoa(downloadedFiles))
+	color.Green("Existing files: " + strconv.Itoa(existingFiles))
+	color.Red("Failed files: " + strconv.Itoa(len(brokenFiles)))
 }
