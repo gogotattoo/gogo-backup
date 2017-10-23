@@ -158,6 +158,14 @@ func main() {
 					}
 				}
 
+				for _, ipfsHash := range tat.VideosIpfs {
+					fmt.Println("video: " + ipfsHash)
+
+					if nil == downloadFileFromIPFS(outputDefault+filePrefix+ipfsHash+".mp4", ipfsHash) {
+						downloadedFiles++
+					}
+				}
+
 				return nil
 			})
 	}()
